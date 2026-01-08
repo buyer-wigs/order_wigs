@@ -1,0 +1,278 @@
+/**
+ * Google Apps Script to populate wig allocation quantities into Google Sheets
+ * OPTIMIZED VERSION - Fast batch processing
+ */
+
+// ============================================================================
+// USER CONFIGURATION - MODIFY THESE VALUES FOR YOUR SHEET
+// ============================================================================
+
+const CONFIG = {
+  SHEET_NAME: "Ideal Order Quantity",
+  CONCAT_COLUMN: "A",
+  QUANTITY_START_COLUMN: "V",
+  DATA_START_ROW: 3,
+  CLEAR_BEFORE_POPULATE: false
+};
+
+// ============================================================================
+// ALLOCATION DATA
+// ============================================================================
+
+const ALLOCATION_DATA = {
+  'Lace1810SW': [0, 0, 0, 0, 0],
+  'Lace1812ST': [0, 2, 3, 1, 0],
+  'Lace1812BW': [0, 3, 5, 1, 0],
+  'Lace1814ST': [0, 2, 4, 1, 0],
+  'Lace1814BW': [1, 3, 5, 1, 0],
+  'Lace1816ST': [0, 2, 3, 1, 0],
+  'Lace1816BW': [1, 3, 4, 1, 1],
+  'Lace1818ST': [0, 2, 3, 1, 0],
+  'Lace1818BW': [0, 3, 6, 1, 0],
+  'Lace1820ST': [0, 1, 3, 1, 0],
+  'Lace1820BW': [0, 2, 5, 1, 0],
+  'Lace1822ST': [0, 1, 2, 0, 0],
+  'Lace1822BW': [0, 1, 2, 1, 0],
+  'Lace1/2812ST': [0, 2, 3, 1, 0],
+  'Lace1/2812BW': [0, 3, 5, 1, 0],
+  'Lace1/2814ST': [0, 2, 4, 1, 0],
+  'Lace1/2814BW': [1, 3, 5, 2, 0],
+  'Lace1/2816ST': [0, 2, 4, 1, 0],
+  'Lace1/2816BW': [1, 3, 5, 2, 0],
+  'Lace1/2818ST': [0, 2, 4, 1, 0],
+  'Lace1/2818BW': [0, 3, 6, 2, 0],
+  'Lace1/2820ST': [0, 1, 3, 1, 0],
+  'Lace1/2820BW': [0, 2, 5, 1, 0],
+  'Lace1/2822ST': [0, 1, 2, 0, 0],
+  'Lace1/2822BW': [0, 1, 3, 1, 0],
+  'Lace2/6812ST': [0, 2, 3, 1, 0],
+  'Lace2/6812BW': [0, 3, 5, 1, 0],
+  'Lace2/6814ST': [0, 2, 3, 1, 0],
+  'Lace2/6814BW': [0, 3, 6, 1, 0],
+  'Lace2/6816ST': [0, 2, 3, 1, 0],
+  'Lace2/6816BW': [0, 3, 6, 1, 0],
+  'Lace2/6818ST': [0, 2, 3, 1, 0],
+  'Lace2/6818BW': [0, 3, 6, 1, 0],
+  'Lace2/6820ST': [0, 1, 2, 1, 0],
+  'Lace2/6820BW': [0, 2, 4, 1, 0],
+  'Lace2/6822ST': [0, 1, 2, 0, 0],
+  'Lace2/6822BW': [0, 1, 2, 1, 0],
+  'Laced4f12ST': [0, 1, 2, 0, 0],
+  'Laced4f12SW': [0, 1, 2, 1, 0],
+  'Laced4f14ST': [0, 1, 2, 0, 0],
+  'Laced4f14SW': [0, 1, 3, 1, 0],
+  'Laced4f16ST': [0, 1, 2, 0, 0],
+  'Laced4f16SW': [0, 1, 3, 1, 0],
+  'Laced4f18ST': [0, 1, 2, 0, 0],
+  'Laced4f18SW': [0, 1, 3, 1, 0],
+  'Laced4f20ST': [0, 1, 1, 0, 0],
+  'Laced4f20SW': [0, 1, 2, 0, 0],
+  'Laced4f22ST': [0, 0, 1, 0, 0],
+  'Laced4f22SW': [0, 1, 1, 0, 0],
+  'LaceJ25100212ST': [0, 1, 2, 0, 0],
+  'LaceJ25100212SW': [0, 1, 3, 1, 0],
+  'LaceJ25100214ST': [0, 1, 2, 0, 0],
+  'LaceJ25100214SW': [0, 1, 3, 1, 0],
+  'LaceJ25100216ST': [0, 1, 2, 0, 0],
+  'LaceJ25100216SW': [0, 1, 3, 1, 0],
+  'LaceJ25100218ST': [0, 1, 2, 0, 0],
+  'LaceJ25100218SW': [0, 1, 3, 1, 0],
+  'LaceJ25100220ST': [0, 1, 2, 0, 0],
+  'LaceJ25100220SW': [0, 1, 2, 1, 0],
+  'LaceJ25100222ST': [0, 1, 1, 0, 0],
+  'LaceJ25100222SW': [0, 1, 1, 0, 0],
+  'LaceJ25100512ST': [0, 1, 2, 0, 0],
+  'LaceJ25100512SW': [0, 1, 2, 1, 0],
+  'LaceJ25100514ST': [0, 1, 2, 0, 0],
+  'LaceJ25100514SW': [0, 1, 3, 1, 0],
+  'LaceJ25100516ST': [0, 1, 2, 0, 0],
+  'LaceJ25100516SW': [0, 1, 3, 1, 0],
+  'LaceJ25100518ST': [0, 1, 2, 0, 0],
+  'LaceJ25100518SW': [0, 1, 3, 1, 0],
+  'LaceJ25100520ST': [0, 1, 1, 0, 0],
+  'LaceJ25100520SW': [0, 1, 2, 1, 0],
+  'LaceJ25100522ST': [0, 0, 1, 0, 0],
+  'LaceJ25100522SW': [0, 1, 1, 0, 0],
+  'Silk1814ST': [0, 1, 1, 0, 0],
+  'Silk1814BW': [1, 1, 1, 2, 1],
+  'Silk1812ST': [0, 1, 1, 0, 0],
+  'Silk1812BW': [0, 1, 2, 1, 0],
+  'Silk1816ST': [0, 1, 1, 0, 0],
+  'Silk1816BW': [0, 1, 2, 1, 0],
+  'Silk1818ST': [0, 0, 1, 0, 0],
+  'Silk1818BW': [0, 0, 1, 0, 0],
+  'Silk1/2814ST': [0, 1, 2, 0, 0],
+  'Silk1/2814BW': [0, 1, 3, 2, 0],
+  'Silk1/2812ST': [0, 1, 1, 0, 0],
+  'Silk1/2812BW': [0, 1, 2, 2, 0],
+  'Silk1/2816ST': [0, 1, 1, 0, 0],
+  'Silk1/2816BW': [0, 1, 3, 1, 0],
+  'Silk1/2818ST': [0, 0, 1, 0, 0],
+  'Silk1/2818BW': [0, 1, 1, 0, 0],
+  'Silk2/6814ST': [0, 1, 1, 0, 0],
+  'Silk2/6814BW': [0, 1, 3, 1, 0],
+  'Silk2/6812ST': [0, 1, 1, 0, 0],
+  'Silk2/6812BW': [0, 1, 2, 1, 0],
+  'Silk2/6816ST': [0, 0, 1, 0, 0],
+  'Silk2/6816BW': [0, 1, 2, 1, 0],
+  'Silk2/6818ST': [0, 0, 0, 0, 0],
+  'Silk2/6818BW': [0, 0, 1, 0, 0],
+  'SilkJ25100214ST': [0, 0, 1, 0, 0],
+  'SilkJ25100214SW': [0, 1, 2, 0, 0],
+  'SilkJ25100212ST': [0, 0, 1, 0, 0],
+  'SilkJ25100212SW': [0, 1, 1, 0, 0],
+  'SilkJ25100216ST': [0, 0, 1, 0, 0],
+  'SilkJ25100216SW': [0, 1, 1, 0, 0],
+  'SilkJ25100218ST': [0, 0, 1, 0, 0],
+  'SilkJ25100218SW': [0, 0, 1, 0, 0],
+  'SilkJ25100514ST': [0, 0, 1, 0, 0],
+  'SilkJ25100514SW': [0, 1, 2, 0, 0],
+  'SilkJ25100512ST': [0, 0, 1, 0, 0],
+  'SilkJ25100512SW': [0, 1, 1, 0, 0],
+  'SilkJ25100516ST': [0, 0, 1, 0, 0],
+  'SilkJ25100516SW': [0, 1, 1, 0, 0],
+  'SilkJ25100518ST': [0, 0, 0, 0, 0],
+  'SilkJ25100518SW': [0, 0, 1, 0, 0],
+  'Silkd4f14ST': [0, 0, 1, 0, 0],
+  'Silkd4f14SW': [0, 1, 1, 0, 0],
+  'Silkd4f12ST': [0, 0, 1, 0, 0],
+  'Silkd4f12SW': [0, 1, 1, 0, 0],
+  'Silkd4f16ST': [0, 0, 1, 0, 0],
+  'Silkd4f16SW': [0, 1, 1, 0, 0],
+  'Silkd4f18ST': [0, 0, 0, 0, 0],
+  'Silkd4f18SW': [0, 0, 0, 0, 0],
+  'Fall1818ST': [0, 1, 1, 0, 0],
+  'Fall1818BW': [1, 3, 1, 2, 1],
+  'Fall1816ST': [0, 1, 1, 0, 0],
+  'Fall1816BW': [0, 2, 3, 1, 0],
+  'Fall1820ST': [0, 1, 1, 0, 0],
+  'Fall1820BW': [0, 2, 2, 2, 0],
+  'Fall1822ST': [0, 0, 1, 0, 0],
+  'Fall1822BW': [0, 1, 2, 0, 0],
+  'Fall1/2818ST': [0, 1, 1, 0, 0],
+  'Fall1/2818BW': [1, 3, 2, 2, 0],
+  'Fall1/2816ST': [0, 1, 1, 0, 0],
+  'Fall1/2816BW': [0, 2, 3, 1, 0],
+  'Fall1/2820ST': [0, 1, 1, 0, 0],
+  'Fall1/2820BW': [0, 2, 2, 2, 0],
+  'Fall1/2822ST': [0, 0, 1, 0, 0],
+  'Fall1/2822BW': [0, 1, 2, 0, 0],
+  'Fall2/6818ST': [0, 1, 1, 0, 0],
+  'Fall2/6818BW': [1, 3, 3, 1, 0],
+  'Fall2/6816ST': [0, 0, 1, 0, 0],
+  'Fall2/6816BW': [0, 2, 2, 1, 0],
+  'Fall2/6820ST': [0, 0, 1, 0, 0],
+  'Fall2/6820BW': [0, 2, 2, 1, 0],
+  'Fall2/6822ST': [0, 0, 0, 0, 0],
+  'Fall2/6822BW': [0, 1, 1, 0, 0],
+  'FallJ25100218ST': [0, 0, 1, 0, 0],
+  'FallJ25100218SW': [0, 1, 2, 1, 0],
+  'FallJ25100216ST': [0, 0, 1, 0, 0],
+  'FallJ25100216SW': [0, 1, 2, 0, 0],
+  'FallJ25100220ST': [0, 0, 1, 0, 0],
+  'FallJ25100220SW': [0, 1, 2, 0, 0],
+  'FallJ25100222ST': [0, 0, 1, 0, 0],
+  'FallJ25100222SW': [0, 1, 1, 0, 0],
+  'FallJ25100518ST': [0, 0, 1, 0, 0],
+  'FallJ25100518SW': [0, 1, 2, 1, 0],
+  'FallJ25100516ST': [0, 0, 1, 0, 0],
+  'FallJ25100516SW': [0, 1, 2, 0, 0],
+  'FallJ25100520ST': [0, 0, 1, 0, 0],
+  'FallJ25100520SW': [0, 1, 2, 0, 0],
+  'FallJ25100522ST': [0, 0, 0, 0, 0],
+  'FallJ25100522SW': [0, 0, 1, 0, 0],
+  'Falld4f18ST': [0, 0, 1, 0, 0],
+  'Falld4f18SW': [0, 1, 2, 0, 0],
+  'Falld4f16ST': [0, 0, 0, 0, 0],
+  'Falld4f16SW': [0, 1, 2, 0, 0],
+  'Falld4f20ST': [0, 0, 0, 0, 0],
+  'Falld4f20SW': [0, 1, 1, 0, 0],
+  'Falld4f22ST': [0, 0, 0, 0, 0],
+  'Falld4f22SW': [0, 0, 1, 0, 0]
+};
+
+// ============================================================================
+// MAIN FUNCTION
+// ============================================================================
+
+function populateAllocation() {
+  try {
+    var spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = spreadsheet.getSheetByName(CONFIG.SHEET_NAME);
+    
+    if (!sheet) {
+      SpreadsheetApp.getUi().alert('Error', 'Sheet "' + CONFIG.SHEET_NAME + '" not found.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    var lastRow = sheet.getLastRow();
+    
+    if (lastRow < CONFIG.DATA_START_ROW) {
+      SpreadsheetApp.getUi().alert('Error', 'No data found in the sheet.', SpreadsheetApp.getUi().ButtonSet.OK);
+      return;
+    }
+    
+    var concatColNum = columnLetterToNumber(CONFIG.CONCAT_COLUMN);
+    var qtyStartColNum = columnLetterToNumber(CONFIG.QUANTITY_START_COLUMN);
+    var numRows = lastRow - CONFIG.DATA_START_ROW + 1;
+    var concatRange = sheet.getRange(CONFIG.DATA_START_ROW, concatColNum, numRows, 1);
+    var concatValues = concatRange.getValues();
+    var outputData = [];
+    var updatedCount = 0;
+    var notFoundCount = 0;
+    var notFoundConcats = [];
+    
+    for (var i = 0; i < concatValues.length; i++) {
+      var concat = concatValues[i][0].toString().trim();
+      
+      if (concat === '') {
+        outputData.push([0, 0, 0, 0, 0]);
+        continue;
+      }
+      
+      if (ALLOCATION_DATA.hasOwnProperty(concat)) {
+        outputData.push(ALLOCATION_DATA[concat]);
+        updatedCount++;
+      } else {
+        outputData.push([0, 0, 0, 0, 0]);
+        notFoundCount++;
+        notFoundConcats.push(concat);
+      }
+    }
+    
+    var qtyRange = sheet.getRange(CONFIG.DATA_START_ROW, qtyStartColNum, outputData.length, 5);
+    qtyRange.setValues(outputData);
+    
+    var message = 'Allocation complete!\n\nUpdated: ' + updatedCount + ' rows\n';
+    
+    if (notFoundCount > 0) {
+      message += '\nNot found: ' + notFoundCount + ' rows\n\nMissing concats (first 10):\n';
+      message += notFoundConcats.slice(0, 10).join('\n');
+      if (notFoundConcats.length > 10) {
+        message += '\n... and ' + (notFoundConcats.length - 10) + ' more';
+      }
+    }
+    
+    SpreadsheetApp.getUi().alert('Success', message, SpreadsheetApp.getUi().ButtonSet.OK);
+    
+  } catch (error) {
+    SpreadsheetApp.getUi().alert('Error', 'An error occurred: ' + error.message, SpreadsheetApp.getUi().ButtonSet.OK);
+    Logger.log('Error: ' + error.message);
+  }
+}
+
+function columnLetterToNumber(letter) {
+  var column = 0;
+  var length = letter.length;
+  for (var i = 0; i < length; i++) {
+    column += (letter.charCodeAt(i) - 64) * Math.pow(26, length - i - 1);
+  }
+  return column;
+}
+
+function onOpen() {
+  var ui = SpreadsheetApp.getUi();
+  ui.createMenu('Wig Allocation')
+    .addItem('Populate Quantities', 'populateAllocation')
+    .addToUi();
+}
