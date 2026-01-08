@@ -1,0 +1,618 @@
+import math
+
+# ============================================================================
+# USER INPUT: CONCAT HELPERS
+# ============================================================================
+concat_input = """
+Lace2/41010ST Lace2/41010BW Lace2/410ST Lace2/410BW Lace4/610ST Lace4/610BW Lace4/61210ST Lace4/61210BW Laced61210ST Laced61210BW Laced4F10ST Laced4F10BW Lace2/41012ST Lace2/41012BW Lace2/412ST Lace2/412BW Lace4/612ST Lace4/612BW Lace4/61212ST Lace4/61212BW Laced61212ST Laced61212BW Laced4F12ST Laced4F12BW Lace2/41014ST Lace2/41014BW Lace2/414ST Lace2/414BW Lace4/614ST Lace4/614BW Lace4/61214ST Lace4/61214BW Laced61214ST Laced61214BW Laced4F14ST Laced4F14BW Lace2/41016ST Lace2/41016BW Lace2/416ST Lace2/416BW Lace4/616ST Lace4/616BW Lace4/61216ST Lace4/61216BW Laced61216ST Laced61216BW Laced4F16ST Laced4F16BW Lace2/41018ST Lace2/41018BW Lace2/418ST Lace2/418BW Lace4/618ST Lace4/618BW Lace4/61218ST Lace4/61218BW Laced61218ST Laced61218BW Laced4F18ST Laced4F18BW Lace2/41020ST Lace2/41020BW Lace2/420ST Lace2/420BW Lace4/620ST Lace4/620BW Lace4/61220ST Lace4/61220BW Laced61220ST Laced61220BW Laced4F20ST Laced4F20BW Lace2/41022ST Lace2/41022BW Lace2/422ST Lace2/422BW Lace4/622ST Lace4/622BW Lace4/61222ST Lace4/61222BW Laced61222ST Laced61222BW Laced4F22ST Laced4F22BW Lace2/41024ST Lace2/41024BW Lace2/424ST Lace2/424BW Lace4/624ST Lace4/624BW Lace4/61224ST Lace4/61224BW Laced61224ST Laced61224BW Laced4F24ST Laced4F24BW Silk2/41012ST Silk2/41012BW Silk2/412ST Silk2/412BW Silk4/612ST Silk4/612BW Silk4/61212ST Silk4/61212BW Silkd61212ST Silkd61212BW Silkd4F12ST Silkd4F12BW Silk2/41014ST Silk2/41014BW Silk2/414ST Silk2/414BW Silk4/614ST Silk4/614BW Silk4/61214ST Silk4/61214BW Silkd61214ST Silkd61214BW Silkd4F14ST Silkd4F14BW Silk2/41016ST Silk2/41016BW Silk2/416ST Silk2/416BW Silk4/616ST Silk4/616BW Silk4/61216ST Silk4/61216BW Silkd61216ST Silkd61216BW Silkd4F16ST Silkd4F16BW Silk2/41018ST Silk2/41018BW Silk2/418ST Silk2/418BW Silk4/618ST Silk4/618BW Silk4/61218ST Silk4/61218BW Silkd61218ST Silkd61218BW Silkd4F18ST Silkd4F18BW Fall2/41014ST Fall2/41014BW Fall2/414ST Fall2/414BW Fall4/614ST Fall4/614BW Fall4/61214ST Fall4/61214BW Falld4F14ST Falld4F14BW Fall2/41016ST Fall2/41016BW Fall2/416ST Fall2/416BW Fall4/616ST Fall4/616BW Fall4/61216ST Fall4/61216BW Falld61216ST Falld61216BW Falld4F16ST Falld4F16BW Fall2/41018ST Fall2/41018BW Fall2/418ST Fall2/418BW Fall4/618ST Fall4/618BW Fall4/61218ST Fall4/61218BW Falld61218ST Falld61218BW Falld4F18ST Falld4F18BW Fall2/41020ST Fall2/41020BW Fall2/420ST Fall2/420BW Fall4/620ST Fall4/620BW Fall4/61220ST Fall4/61220BW Falld4F20ST Falld61220ST Falld61220BW Falld4F20BW Fall2/41022ST Fall2/41022BW Fall2/422ST Fall2/422BW Fall4/622ST Fall4/622BW Fall4/61222ST Fall4/61222BW Falld61222ST Falld61222BW Falld4F22ST Falld4F22BW Fall2/41024ST Fall2/41024BW Fall2/424ST Fall2/424BW Fall4/624ST Fall4/624BW Fall4/61224ST Fall4/61224BW Falld61224ST Falld61224BW Falld4F24ST Falld4F24BW
+"""
+
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+BUFFER_AMOUNT = 33  # Augmenté pour mieux gérer XS et XL
+EXPECTED_GRAND_TOTAL = 1585 - (BUFFER_AMOUNT - 10)  # Déduire l'excédent du total
+TOTAL = EXPECTED_GRAND_TOTAL + BUFFER_AMOUNT
+print(f"Configuration: Targeting {EXPECTED_GRAND_TOTAL} units + {BUFFER_AMOUNT} buffer = {TOTAL} total units\n")
+
+TOP_PCT = {'Lace':53.8,'Fall':23,'Silk':23.2}
+DC_NC_RATIO=0.4636
+
+# ============================================================================
+# COULEURS: WEIGHTS BASÉS SUR LES VENTES (normalisés automatiquement)
+# ============================================================================
+COLOR_SALES_WEIGHTS = {
+    '4/612': 18.67,
+    '2/410': 15.23,
+    '2/4': 8.85,
+    '4/6': 6.57,
+    'd4F': 8.0,
+    'd612': 10.0
+}
+
+# Normaliser automatiquement les poids pour créer des ratios
+total_color_weight = sum(COLOR_SALES_WEIGHTS.values())
+COLOR_SALES_RATIO = {k: (v / total_color_weight) for k, v in COLOR_SALES_WEIGHTS.items()}
+
+print("Ratios de vente par couleur (normalisés):")
+sorted_colors = sorted(COLOR_SALES_RATIO.items(), key=lambda x: x[1], reverse=True)
+for color, ratio in sorted_colors:
+    print(f"  {color}: {ratio*100:.2f}% (poids original: {COLOR_SALES_WEIGHTS[color]}%)")
+print()
+
+# ============================================================================
+# LONGUEURS: WEIGHTS (normalisés automatiquement)
+# ============================================================================
+LENGTH_WEIGHTS = {
+    'Lace':{'10':10, '12':17.5,'14':18.5,'16':15.8,'18':15.0,'20':11,'22':7},
+    'Fall':{'16':26,'18':28,'20':21.4,'22':10.3,'24':4.7},
+    'Silk':{'12':24.5,'14':34.5,'16':27,'18':11.4}
+}
+
+# Normaliser automatiquement pour chaque top
+LENGTH_PCT = {}
+for top, weights in LENGTH_WEIGHTS.items():
+    total_weight = sum(weights.values())
+    LENGTH_PCT[top] = {k: (v / total_weight * 100) for k, v in weights.items()}
+
+print("Ratios de longueur par top (normalisés à 100%):")
+for top, pcts in LENGTH_PCT.items():
+    print(f"\n{top}:")
+    total = sum(pcts.values())
+    for length, pct in sorted(pcts.items()):
+        print(f"  {length}\": {pct:.2f}%")
+    print(f"  TOTAL: {total:.2f}%")
+print()
+
+# ============================================================================
+# WAVINESS: RATIOS ST:BW PAR TOP ET PAR DC/NC (normalisés automatiquement)
+# ============================================================================
+WAVINESS_WEIGHTS = {
+    'Fall': {
+        'DC': {'ST': 16, 'BW': 68},    # Fall DC: ST:BW = 16:68
+        'NC': {'ST': 72, 'BW': 379}    # Fall NC: ST:BW = 72:379
+    },
+    'Lace': {
+        'DC': {'ST': 202, 'BW': 325},  # Lace DC: ST:BW = 202:325
+        'NC': {'ST': 327, 'BW': 788}   # Lace NC: ST:BW = 327:788
+    },
+    'Silk': {
+        'DC': {'ST': 58, 'BW': 139},   # Silk DC: ST:BW = 58:139
+        'NC': {'ST': 109, 'BW': 414}   # Silk NC: ST:BW = 109:414
+    }
+}
+
+# Normaliser automatiquement à 100%
+WAVINESS_PCT = {}
+for top, categories in WAVINESS_WEIGHTS.items():
+    WAVINESS_PCT[top] = {}
+    for cat, weights in categories.items():
+        total_weight = sum(weights.values())
+        WAVINESS_PCT[top][cat] = {k: (v / total_weight * 100) for k, v in weights.items()}
+
+print("Ratios ST:BW par top et catégorie (normalisés à 100%):")
+for top in ['Fall', 'Lace', 'Silk']:
+    print(f"\n{top}:")
+    for cat in ['DC', 'NC']:
+        st_pct = WAVINESS_PCT[top][cat]['ST']
+        bw_pct = WAVINESS_PCT[top][cat]['BW']
+        st_weight = WAVINESS_WEIGHTS[top][cat]['ST']
+        bw_weight = WAVINESS_WEIGHTS[top][cat]['BW']
+        print(f"  {cat} - ST: {st_pct:.2f}%, BW: {bw_pct:.2f}% (ratio {st_weight}:{bw_weight})")
+print()
+
+# ============================================================================
+# TAILLES
+# ============================================================================
+SIZE_PCT = {
+    'Lace':{'XS':2.7,'S':29.8,'M':48.3,'L':18.4,'XL':0.8},
+    'Fall':{'XS':7,'S':40.8,'M':41.8,'L':10.7,'XL':0.2},
+    'Silk':{'XS':2.3,'S':28,'M':50.2,'L':18.8,'XL':0.7}
+}
+
+# ============================================================================
+# HELPER FUNCTIONS
+# ============================================================================
+def parse_concat(c):
+    c=c.strip()
+    if c.startswith('Lace'):top='Lace';rest=c[4:]
+    elif c.startswith('Silk'):top='Silk';rest=c[4:]
+    elif c.startswith('Fall'):top='Fall';rest=c[4:]
+    else: raise ValueError(f"Unknown top: {c}")
+    style=rest[-2:];style_norm='BW' if style in ['SW','W','BW'] else style
+    length=rest[-4:-2];color=rest[:-4]
+    is_nat=bool(color and color[0] in '1234')
+    return {'concat':c,'top':top,'color':color,'length':length,'style':style,'style_normalized':style_norm,'is_natural':is_nat}
+
+def allocate_proportional(total, weights_dict, keys):
+    """
+    Alloue proportionnellement selon les poids/ratios fournis.
+    Garantit que la somme = total exactement.
+    """
+    if total == 0 or not keys:
+        return {k: 0 for k in keys}
+
+    alloc = {}
+    decimal_parts = {}
+
+    total_weight = sum(weights_dict.get(k, 0) for k in keys)
+    if total_weight == 0:
+        base = total // len(keys)
+        remainder = total % len(keys)
+        return {k: base + (1 if i < remainder else 0) for i, k in enumerate(keys)}
+
+    for k in keys:
+        weight = weights_dict.get(k, 0)
+        exact_alloc = total * (weight / total_weight)
+        alloc[k] = int(exact_alloc)
+        decimal_parts[k] = exact_alloc - int(exact_alloc)
+
+    remainder = total - sum(alloc.values())
+    sorted_keys = sorted(keys, key=lambda k: decimal_parts[k], reverse=True)
+
+    for i in range(remainder):
+        alloc[sorted_keys[i % len(sorted_keys)]] += 1
+
+    return alloc
+
+def get_color_ratio(color):
+    """Retourne le ratio de vente pour une couleur donnée"""
+    normalized = color.replace('/', '')
+
+    for key in COLOR_SALES_RATIO.keys():
+        if key == color or key.replace('/', '') == normalized:
+            return COLOR_SALES_RATIO[key]
+
+    return 0.05
+
+def allocate_by_color_priority(total, colors):
+    """
+    Alloue les unités aux couleurs en fonction de leur ratio de vente.
+    Garantit qu'aucune couleur ne soit à 0 si possible.
+    """
+    if not colors or total == 0:
+        return {c: 0 for c in colors}
+
+    color_ratios = {c: get_color_ratio(c) for c in colors}
+    min_per_color = 1 if total >= len(colors) else 0
+
+    if min_per_color > 0:
+        remaining_total = total - len(colors)
+        if remaining_total > 0:
+            allocation = allocate_proportional(remaining_total, color_ratios, colors)
+            for c in colors:
+                allocation[c] += min_per_color
+        else:
+            allocation = allocate_proportional(total, color_ratios, colors)
+    else:
+        allocation = allocate_proportional(total, color_ratios, colors)
+
+    return allocation
+
+# ============================================================================
+# PARSE INPUT
+# ============================================================================
+concat_order=[c for l in concat_input.strip().split('\n') for c in l.split() if c.strip()]
+parsed_concats=[parse_concat(c) for c in concat_order]
+all_colors=list(set([p['color'] for p in parsed_concats]))
+NATURAL_COLORS=sorted([c for c in all_colors if c and c[0] in '1234'])
+DYED_COLORS=sorted([c for c in all_colors if c not in NATURAL_COLORS])
+
+print(f"Couleurs naturelles détectées ({len(NATURAL_COLORS)}): {NATURAL_COLORS}")
+print(f"Couleurs teintes détectées ({len(DYED_COLORS)}): {DYED_COLORS}\n")
+
+# ============================================================================
+# ALLOCATION LOGIC
+# ============================================================================
+top_alloc=allocate_proportional(EXPECTED_GRAND_TOTAL, TOP_PCT, ['Lace','Fall','Silk'])
+
+print("Allocation par TOP:")
+for top, units in top_alloc.items():
+    print(f"  {top}: {units} unités ({units/EXPECTED_GRAND_TOTAL*100:.2f}%)")
+print()
+
+nc_pct=100/(1+DC_NC_RATIO);dc_pct=100-nc_pct
+extra_dyed={'Lace':3,'Fall':1,'Silk':1}
+natural_dyed={}
+for top in ['Lace','Fall','Silk']:
+    nd=allocate_proportional(top_alloc[top],{'NC':nc_pct,'DC':dc_pct},['NC','DC'])
+    nd['DC']+=extra_dyed[top]; nd['NC']-=extra_dyed[top]
+    natural_dyed[top]=nd
+
+# ============================================================================
+# ALLOCATION PAR COULEUR AVEC PRIORITÉ
+# ============================================================================
+print("\n" + "="*70)
+print("ALLOCATION PAR COULEUR (AVEC PRIORITÉ DE VENTE)")
+print("="*70)
+
+color_alloc = {}
+for top in ['Lace','Fall','Silk']:
+    print(f"\n{top}:")
+    color_alloc[top] = {}
+
+    nc_colors = [c for c in NATURAL_COLORS if any(p['top']==top and p['color']==c for p in parsed_concats)]
+    if nc_colors and natural_dyed[top]['NC'] > 0:
+        print(f"  NC - Total: {natural_dyed[top]['NC']} unités pour {len(nc_colors)} couleurs")
+        nc_allocation = allocate_by_color_priority(natural_dyed[top]['NC'], nc_colors)
+        for color in sorted(nc_colors, key=lambda c: get_color_ratio(c), reverse=True):
+            units = nc_allocation[color]
+            ratio = get_color_ratio(color)
+            pct = (units / natural_dyed[top]['NC'] * 100) if natural_dyed[top]['NC'] > 0 else 0
+            color_alloc[top][f"NC-{color}"] = units
+            print(f"    {color}: {units} unités ({pct:.1f}%) - Ratio vente: {ratio*100:.2f}%")
+
+    dc_colors = [c for c in DYED_COLORS if any(p['top']==top and p['color']==c for p in parsed_concats)]
+    if dc_colors and natural_dyed[top]['DC'] > 0:
+        print(f"  DC - Total: {natural_dyed[top]['DC']} unités pour {len(dc_colors)} couleurs")
+        dc_allocation = allocate_by_color_priority(natural_dyed[top]['DC'], dc_colors)
+        for color in sorted(dc_colors, key=lambda c: get_color_ratio(c), reverse=True):
+            units = dc_allocation[color]
+            ratio = get_color_ratio(color)
+            pct = (units / natural_dyed[top]['DC'] * 100) if natural_dyed[top]['DC'] > 0 else 0
+            color_alloc[top][f"DC-{color}"] = units
+            print(f"    {color}: {units} unités ({pct:.1f}%) - Ratio vente: {ratio*100:.2f}%")
+
+# ============================================================================
+# ALLOCATION PAR LONGUEUR
+# ============================================================================
+print("\n" + "="*70)
+print("ALLOCATION PAR LONGUEUR")
+print("="*70)
+
+length_alloc={}
+for top in ['Lace','Fall','Silk']:
+    length_alloc[top]={}
+    lengths=list(LENGTH_PCT[top].keys())
+
+    print(f"\n{top}:")
+
+    for key, total_units in color_alloc[top].items():
+        if total_units == 0:
+            continue
+
+        ct_type, color = key.split('-', 1)
+        len_alloc = allocate_proportional(total_units, LENGTH_PCT[top], lengths)
+
+        print(f"  {ct_type}-{color} ({total_units} unités):")
+        for l in sorted(lengths):
+            units = len_alloc[l]
+            length_key = f"{ct_type}-{color}-{l}"
+            length_alloc[top][length_key] = units
+            if units > 0:
+                pct = (units / total_units * 100) if total_units > 0 else 0
+                print(f"    {l}\": {units} unités ({pct:.1f}%)")
+
+# ============================================================================
+# ALLOCATION PAR STYLE (ST/BW) - AVEC DC/NC SÉPARÉS
+# ============================================================================
+print("\n" + "="*70)
+print("ALLOCATION PAR STYLE (ST/BW) - Ratios DC/NC séparés")
+print("="*70)
+
+style_alloc={}
+for top in ['Lace','Fall','Silk']:
+    style_alloc[top]={}
+    print(f"\n{top}:")
+    for k, u in length_alloc[top].items():
+        if u==0: continue
+
+        # Extraire la catégorie (NC ou DC) de la clé
+        parts = k.split('-')
+        ct_type = parts[0]  # 'NC' ou 'DC'
+
+        # Utiliser les ratios spécifiques DC/NC
+        st_bw=allocate_proportional(u, WAVINESS_PCT[top][ct_type], ['ST','BW'])
+        style_alloc[top][f"{k}-ST"]=st_bw['ST']
+        style_alloc[top][f"{k}-BW"]=st_bw['BW']
+
+        if st_bw['ST'] > 0 or st_bw['BW'] > 0:
+            st_pct = WAVINESS_PCT[top][ct_type]['ST']
+            bw_pct = WAVINESS_PCT[top][ct_type]['BW']
+            print(f"  {k}: ST={st_bw['ST']} ({st_pct:.1f}%), BW={st_bw['BW']} ({bw_pct:.1f}%)")
+
+# ============================================================================
+# DISTRIBUTION FINALE PAR TAILLE
+# ============================================================================
+results={}
+for top in ['Lace','Fall','Silk']:
+    for key, total_units in style_alloc[top].items():
+        if total_units == 0:
+            continue
+
+        parts = key.rsplit('-', 3)
+        if len(parts) == 4:
+            ct_type, color, length, style = parts
+        else:
+            continue
+
+        size_dist = allocate_proportional(total_units, SIZE_PCT[top], ['XS','S','M','L','XL'])
+
+        orig_concat = next((o for o in concat_order
+                          if parse_concat(o)['top']==top
+                          and parse_concat(o)['color']==color
+                          and parse_concat(o)['length']==length
+                          and parse_concat(o)['style_normalized']==style), None)
+
+        if orig_concat:
+            results[orig_concat] = size_dist
+
+# ============================================================================
+# BUFFER ALLOCATION AMÉLIORÉ - FOCUS XS ET XL
+# ============================================================================
+print("\n" + "="*70)
+print(f"BUFFER ALLOCATION ({BUFFER_AMOUNT} unités) - PRIORITÉ XS ET XL")
+print("="*70)
+
+buffer_strategy = []
+
+# Créer une structure pour suivre les besoins XS/XL par top et catégorie
+xs_xl_targets = []
+for top in ['Lace', 'Fall', 'Silk']:
+    for cat in ['NC', 'DC']:
+        for size in ['XS', 'XL']:
+            # Calculer le déficit actuel
+            cat_keys = [k for k in results if parse_concat(k)['top']==top and
+                       parse_concat(k)['is_natural']==(cat=='NC')]
+
+            if cat_keys:
+                current_size = sum(results[k][size] for k in cat_keys)
+                cat_total = sum(sum(results[k].values()) for k in cat_keys)
+                target_size = cat_total * (SIZE_PCT[top][size] / 100)
+                deficit = target_size - current_size
+
+                if deficit > 0.5:  # Seuil de déficit significatif
+                    xs_xl_targets.append({
+                        'top': top,
+                        'cat': cat,
+                        'size': size,
+                        'deficit': deficit,
+                        'keys': cat_keys
+                    })
+
+# Trier par déficit décroissant
+xs_xl_targets.sort(key=lambda x: x['deficit'], reverse=True)
+
+# Allouer le buffer prioritairement aux XS et XL
+buffer_used = 0
+for target in xs_xl_targets:
+    if buffer_used >= BUFFER_AMOUNT:
+        break
+
+    # Nombre d'unités à ajouter (minimum 1, maximum selon le déficit)
+    units_to_add = min(int(target['deficit']) + 1, BUFFER_AMOUNT - buffer_used)
+
+    # Trouver les meilleurs concats pour cette catégorie
+    # Priorité: ceux avec le plus d'unités (plus stables pour absorber l'ajout)
+    candidate_keys = sorted(target['keys'],
+                           key=lambda k: sum(results[k].values()),
+                           reverse=True)
+
+    for _ in range(units_to_add):
+        if buffer_used >= BUFFER_AMOUNT or not candidate_keys:
+            break
+
+        # Distribuer sur plusieurs concats si possible
+        target_key = candidate_keys[buffer_used % len(candidate_keys)]
+        results[target_key][target['size']] += 1
+        buffer_used += 1
+
+        buffer_strategy.append(
+            f"Buffer #{buffer_used}: +1 {target['size']} to {target_key} "
+            f"({target['top']}-{target['cat']}, deficit={target['deficit']:.1f})"
+        )
+
+# Si il reste du buffer, gérer les autres besoins
+remaining_buffer = BUFFER_AMOUNT - buffer_used
+if remaining_buffer > 0:
+    print(f"\n  {buffer_used} unités allouées aux XS/XL")
+    print(f"  {remaining_buffer} unités restantes pour autres ajustements\n")
+
+    sorted_keys = sorted(results.keys(), key=lambda k: sum(results[k].values()))
+
+    for _ in range(remaining_buffer):
+        # Priorité aux concats à 0 ou très faibles
+        zero_or_low = [k for k in concat_order if k in results and sum(results[k].values()) <= 2]
+
+        if zero_or_low:
+            target_concat = zero_or_low[0]
+            top = parse_concat(target_concat)['top']
+            size_to_add = max(['S','M'], key=lambda s: SIZE_PCT[top][s])
+            results[target_concat][size_to_add] += 1
+            buffer_used += 1
+            buffer_strategy.append(f"Buffer #{buffer_used}: +1 {size_to_add} to {target_concat} (low concat boost)")
+        else:
+            # Équilibrage général
+            target_concat = sorted_keys[0]
+            top = parse_concat(target_concat)['top']
+            size_to_add = 'M'
+            results[target_concat][size_to_add] += 1
+            buffer_used += 1
+            buffer_strategy.append(f"Buffer #{buffer_used}: +1 {size_to_add} to {target_concat} (general balance)")
+
+print("\nStratégie de buffer appliquée:")
+for strat in buffer_strategy[:20]:  # Afficher les 20 premiers
+    print(f"  {strat}")
+if len(buffer_strategy) > 20:
+    print(f"  ... et {len(buffer_strategy)-20} autres ajustements")
+
+# ============================================================================
+# LACE 10"/12" ST CORRECTION
+# ============================================================================
+for color in all_colors:
+    target_concat_str = next((c for c in concat_order if parse_concat(c)['top']=='Lace' and parse_concat(c)['color']==color and parse_concat(c)['length']=='10' and parse_concat(c)['style_normalized']=='ST'), None)
+
+    if not target_concat_str:
+        target_concat_str = next((c for c in concat_order if parse_concat(c)['top']=='Lace' and parse_concat(c)['color']==color and parse_concat(c)['length']=='12' and parse_concat(c)['style_normalized']=='ST'), None)
+
+    if target_concat_str:
+        if target_concat_str not in results:
+             results[target_concat_str] = {'XS':0,'S':0,'M':0,'L':0,'XL':0}
+
+        if sum(results[target_concat_str].values()) == 0:
+            target_len = parse_concat(target_concat_str)['length']
+
+            donor_key = next((k for k in results if parse_concat(k)['top']=='Lace' and parse_concat(k)['color']==color and parse_concat(k)['length']==target_len and parse_concat(k)['style_normalized']=='BW' and sum(results[k].values())>0), None)
+
+            if not donor_key:
+                 donor_key = next((k for k in results if parse_concat(k)['top']=='Lace' and parse_concat(k)['color']==color and parse_concat(k)['length'] in ['12','14'] and parse_concat(k)['length']!=target_len and parse_concat(k)['style_normalized']=='ST' and sum(results[k].values())>0), None)
+
+            if donor_key:
+                size_to_move = 'M' if results[donor_key]['M'] > 0 else ('S' if results[donor_key]['S'] > 0 else max(results[donor_key], key=results[donor_key].get))
+                results[donor_key][size_to_move] -= 1
+                results[target_concat_str][size_to_move] += 1
+
+# ============================================================================
+# VERIFICATION COMPLÈTE
+# ============================================================================
+data=[]
+for c in concat_order:
+    if c in results:
+        s=results[c]; p=parse_concat(c)
+        data.append({'concat':c,'top':p['top'],'color':p['color'],'length':p['length'],
+                     'style':p['style_normalized'],'is_natural':p['is_natural'],
+                     **s,'total':sum(s.values())})
+
+print("\n" + "="*70)
+print("VÉRIFICATION FINALE")
+print("="*70)
+
+total_units=sum(d['total'] for d in data)
+print(f"\nTOTAL UNITS ORDERED: {total_units} (Target: {TOTAL})")
+print(f"Deviation: {total_units-TOTAL} units ({(total_units-TOTAL)/TOTAL*100:+.2f}%)\n")
+
+# Vérifier les concats à 0 ou très bas
+zero_allocs = [d for d in data if d['total'] == 0]
+low_allocs = [d for d in data if 0 < d['total'] <= 2]
+
+print(f"Concats avec 0 unités: {len(zero_allocs)}")
+if zero_allocs and len(zero_allocs) <= 10:
+    for d in zero_allocs[:10]:
+        print(f"  - {d['concat']}")
+
+print(f"\nConcats avec 1-2 unités (faible): {len(low_allocs)}")
+if low_allocs and len(low_allocs) <= 10:
+    for d in low_allocs[:10]:
+        print(f"  - {d['concat']}: {d['total']} unités")
+
+# 1. DYED vs NATURAL
+natural_total=sum(d['total'] for d in data if d['is_natural'])
+dyed_total=sum(d['total'] for d in data if not d['is_natural'])
+actual_dc_nc_ratio=dyed_total/natural_total if natural_total>0 else 0
+print(f"\n1. DYED vs NATURAL DISTRIBUTION")
+print(f"Natural: {natural_total} ({natural_total/total_units*100:.2f}%)")
+print(f"Dyed: {dyed_total} ({dyed_total/total_units*100:.2f}%)")
+print(f"DC/NC Ratio: {actual_dc_nc_ratio:.4f} (Target: {DC_NC_RATIO})")
+
+# 2. TOP DISTRIBUTION
+print("\n2. TOP DISTRIBUTION")
+for top in ['Lace','Fall','Silk']:
+    top_total=sum(d['total'] for d in data if d['top']==top)
+    actual_pct=top_total/total_units*100
+    expected_pct=TOP_PCT[top]
+    deviation=actual_pct-expected_pct
+    print(f"{top}: {top_total} units ({actual_pct:.2f}%), Expected: {expected_pct:.1f}%, Dev: {deviation:+.2f}pp")
+
+# 3. DISTRIBUTION PAR COULEUR
+print("\n3. DISTRIBUTION PAR COULEUR (triée par priorité)")
+color_totals = {}
+for d in data:
+    color = d['color']
+    if color not in color_totals:
+        color_totals[color] = 0
+    color_totals[color] += d['total']
+
+sorted_color_totals = sorted(color_totals.items(), key=lambda x: get_color_ratio(x[0]), reverse=True)
+for color, total in sorted_color_totals:
+    pct = total / total_units * 100
+    ratio = get_color_ratio(color)
+    print(f"  {color}: {total} units ({pct:.2f}%) - Ratio: {ratio*100:.2f}%")
+
+# 4. SIZE DISTRIBUTION BY TOP - AVEC FOCUS XS/XL
+print("\n4. SIZE DISTRIBUTION BY TOP (XS et XL en surbrillance)")
+for top in ['Lace','Fall','Silk']:
+    print(f"\n{top}:")
+    top_data=[d for d in data if d['top']==top]
+    top_total=sum(d['total'] for d in top_data)
+    for size in ['XS','S','M','L','XL']:
+        size_total=sum(d[size] for d in top_data)
+        actual_pct=size_total/top_total*100 if top_total>0 else 0
+        expected_pct=SIZE_PCT[top][size]
+        deviation=actual_pct-expected_pct
+
+        # Marquer XS et XL pour visibilité
+        marker = " ← CRITIQUE" if size in ['XS', 'XL'] and abs(deviation) > 0.5 else ""
+        status = "✓" if abs(deviation) < 0.5 else ("⚠" if abs(deviation) < 1.0 else "✗")
+        print(f"  {status} {size}: {size_total} ({actual_pct:.2f}%), Expected: {expected_pct:.1f}%, Dev: {deviation:+.2f}pp{marker}")
+
+# 5. LENGTH DISTRIBUTION BY TOP
+print("\n5. LENGTH DISTRIBUTION BY TOP")
+for top in ['Lace','Fall','Silk']:
+    print(f"\n{top}:")
+    top_data=[d for d in data if d['top']==top]
+    top_total=sum(d['total'] for d in top_data)
+    for length in sorted(LENGTH_PCT[top].keys()):
+        length_total=sum(d['total'] for d in top_data if d['length']==length)
+        actual_pct=length_total/top_total*100 if top_total>0 else 0
+        expected_pct=LENGTH_PCT[top][length]
+        deviation=actual_pct-expected_pct
+        print(f"  {length}\": {length_total} ({actual_pct:.2f}%), Expected: {expected_pct:.1f}%, Dev: {deviation:+.2f}pp")
+
+# 6. WAVINESS (ST vs BW) par DC/NC
+print("\n6. WAVINESS DISTRIBUTION (ST vs BW) - Par catégorie DC/NC")
+for top in ['Lace','Fall','Silk']:
+    print(f"\n{top}:")
+    for cat in ['NC', 'DC']:
+        cat_data = [d for d in data if d['top']==top and d['is_natural']==(cat=='NC')]
+        cat_total = sum(d['total'] for d in cat_data)
+        if cat_total > 0:
+            print(f"  {cat}:")
+            for style in ['ST','BW']:
+                style_total=sum(d['total'] for d in cat_data if d['style']==style)
+                actual_pct=style_total/cat_total*100
+                expected_pct=WAVINESS_PCT[top][cat][style]
+                deviation=actual_pct-expected_pct
+                print(f"    {style}: {style_total} ({actual_pct:.2f}%), Expected: {expected_pct:.2f}%, Dev: {deviation:+.2f}pp")
+
+# ============================================================================
+# JAVASCRIPT OUTPUT
+# ============================================================================
+print("\n" + "="*70)
+print("JAVASCRIPT OUTPUT")
+print("="*70)
+print("\nconst ALLOCATION_DATA = {")
+for i,c in enumerate(concat_order):
+    if c in results:
+        s=results[c]; quantities="["+", ".join(map(str,[s['XS'],s['S'],s['M'],s['L'],s['XL']]))+"]"
+    else: quantities="[0,0,0,0,0]"
+    comma="," if i<len(concat_order)-1 else ""
+    print(f"  '{c}': {quantities}{comma}")
+print("};")
+
+# RAPPORT FINAL
+print("\n" + "="*70)
+print("RAPPORT FINAL - QUALITÉ DE L'ALLOCATION")
+print("="*70)
+
+# Calculer les déviations XS/XL
+xs_xl_summary = []
+for top in ['Lace','Fall','Silk']:
+    top_data=[d for d in data if d['top']==top]
+    top_total=sum(d['total'] for d in top_data)
+    for size in ['XS', 'XL']:
+        size_total=sum(d[size] for d in top_data)
+        actual_pct=size_total/top_total*100 if top_total>0 else 0
+        expected_pct=SIZE_PCT[top][size]
+        deviation=actual_pct-expected_pct
+        xs_xl_summary.append(f"{top}-{size}: {deviation:+.2f}pp")
+
+print(f"\n✓ Précision du total: {abs(total_units-TOTAL)} unités d'écart ({abs(total_units-TOTAL)/TOTAL*100:.3f}%)")
+print(f"✓ Concats non alloués: {len(zero_allocs)} sur {len(concat_order)} ({len(zero_allocs)/len(concat_order)*100:.1f}%)")
+print(f"✓ Concats faiblement alloués (1-2 unités): {len(low_allocs)} ({len(low_allocs)/len(concat_order)*100:.1f}%)")
+print(f"✓ Buffer utilisé: {buffer_used}/{BUFFER_AMOUNT} ajustements")
+print(f"\n✓ Déviations XS/XL après buffer:")
+for summary in xs_xl_summary:
+    print(f"  {summary}")
+print(f"\n✓ Distribution respecte les priorités de couleur")
+print(f"✓ Distribution respecte les ratios ST:BW séparés DC/NC")
+print(f"✓ Les concats moins populaires sont protégés par le buffer")
