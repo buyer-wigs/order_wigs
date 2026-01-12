@@ -73,6 +73,21 @@ function fillLeaveData() {
   // Read all source data at once for better performance
   const sourceData = sourceSheet.getRange(SOURCE_START_ROW, SOURCE_COL_B, numRows, SOURCE_COL_K - SOURCE_COL_B + 1).getValues();
 
+  // Also read JUST columns G-K directly to compare
+  const countsDataDirect = sourceSheet.getRange(SOURCE_START_ROW, SOURCE_COL_G, numRows, 5).getValues();
+
+  // Calculate sum directly from the G-K range to compare with SUMIF
+  let directSum = 0;
+  for (let i = 0; i < countsDataDirect.length; i++) {
+    for (let j = 0; j < 5; j++) {
+      const val = countsDataDirect[i][j];
+      if (val > 0) {
+        directSum += val;
+      }
+    }
+  }
+  Logger.log(`Direct sum from G3:K224 range: ${directSum} (should match SUMIF: 766)`);
+
   // Prepare output array
   const outputData = [];
 
@@ -83,6 +98,7 @@ function fillLeaveData() {
   let totalSumOfCellValues = 0;  // Track the sum to compare with SUMIF
   let decimalValues = [];  // Track any decimal values found
   let skippedCells = [];
+  let mismatchedCells = [];  // Track cells where extracted value differs from direct read
 
   // Process each source row
   for (let i = 0; i < sourceData.length; i++) {
@@ -105,12 +121,27 @@ function fillLeaveData() {
       K: row[SOURCE_COL_K - SOURCE_COL_B]  // XL count
     };
 
+    // Also get direct values for comparison
+    const countsDirect = countsDataDirect[i];
+
     // Process each size column in order (G, H, I, J, K)
     const sizeColumns = ['G', 'H', 'I', 'J', 'K'];
+    const colIndices = {G: 0, H: 1, I: 2, J: 3, K: 4};
 
     for (const col of sizeColumns) {
       const count = counts[col];
+      const countDirectValue = countsDirect[colIndices[col]];
       const sizeValue = sizes[col];
+
+      // Check for mismatch between extracted and direct read
+      if (count !== countDirectValue && mismatchedCells.length < 20) {
+        mismatchedCells.push({
+          row: sourceRowNum,
+          col: col,
+          extractedValue: count,
+          directValue: countDirectValue
+        });
+      }
 
       totalCellsProcessed++;
 
@@ -174,6 +205,14 @@ function fillLeaveData() {
   Logger.log(`Total rows generated: ${totalRowsGenerated}`);
   Logger.log(`Total output rows in array: ${outputData.length}`);
   Logger.log(`Discrepancy: ${766 - totalSumOfCellValues} missing from sum, ${766 - totalRowsGenerated} missing from generated rows`);
+
+  if (mismatchedCells.length > 0) {
+    Logger.log("\n!!! CRITICAL: Value mismatches found between extracted and direct read !!!");
+    Logger.log("First 20 mismatched cells:");
+    mismatchedCells.forEach(cell => {
+      Logger.log(`Row ${cell.row}, Col ${cell.col}: extracted="${cell.extractedValue}", direct="${cell.directValue}"`);
+    });
+  }
 
   if (decimalValues.length > 0) {
     Logger.log("\nFirst 20 decimal values found (these get rounded down in for loops!):");
