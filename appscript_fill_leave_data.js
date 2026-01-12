@@ -80,6 +80,8 @@ function fillLeaveData() {
   let totalCellsProcessed = 0;
   let totalCellsWithValueGreaterThanZero = 0;
   let totalRowsGenerated = 0;
+  let totalSumOfCellValues = 0;  // Track the sum to compare with SUMIF
+  let decimalValues = [];  // Track any decimal values found
   let skippedCells = [];
 
   // Process each source row
@@ -127,6 +129,12 @@ function fillLeaveData() {
       }
 
       totalCellsWithValueGreaterThanZero++;
+      totalSumOfCellValues += countNum;
+
+      // Check if value is decimal (might cause rounding issues)
+      if (countNum % 1 !== 0 && decimalValues.length < 20) {
+        decimalValues.push({row: sourceRowNum, col: col, value: countNum});
+      }
 
       // Create the specified number of rows
       for (let copy = 0; copy < countNum; copy++) {
@@ -162,8 +170,17 @@ function fillLeaveData() {
   Logger.log("=== DEBUGGING STATISTICS ===");
   Logger.log(`Total cells processed (G-K across all rows): ${totalCellsProcessed}`);
   Logger.log(`Total cells with value > 0: ${totalCellsWithValueGreaterThanZero}`);
+  Logger.log(`Total SUM of cell values > 0: ${totalSumOfCellValues} (compare with your SUMIF result: 766)`);
   Logger.log(`Total rows generated: ${totalRowsGenerated}`);
   Logger.log(`Total output rows in array: ${outputData.length}`);
+  Logger.log(`Discrepancy: ${766 - totalSumOfCellValues} missing from sum, ${766 - totalRowsGenerated} missing from generated rows`);
+
+  if (decimalValues.length > 0) {
+    Logger.log("\nFirst 20 decimal values found (these get rounded down in for loops!):");
+    decimalValues.forEach(cell => {
+      Logger.log(`Row ${cell.row}, Col ${cell.col}: value=${cell.value}`);
+    });
+  }
 
   if (skippedCells.length > 0) {
     Logger.log("\nFirst 20 unexpected skipped cells:");
@@ -181,6 +198,6 @@ function fillLeaveData() {
     Logger.log("No data to write (all counts were 0 or negative)");
   }
 
-  const alertMessage = `Process complete!\n\nGenerated ${outputData.length} rows in "${DESTINATION_SHEET_NAME}" sheet.\n\nCells processed: ${totalCellsProcessed}\nCells > 0: ${totalCellsWithValueGreaterThanZero}\n\nCheck the Apps Script log (Ctrl/Cmd+Enter) for more details.`;
+  const alertMessage = `Process complete!\n\nGenerated ${outputData.length} rows in "${DESTINATION_SHEET_NAME}" sheet.\n\nCells processed: ${totalCellsProcessed}\nCells > 0: ${totalCellsWithValueGreaterThanZero}\nSum of values: ${totalSumOfCellValues}\nExpected (SUMIF): 766\nDiscrepancy: ${766 - totalSumOfCellValues}\n\nCheck the Apps Script log (Ctrl/Cmd+Enter) for detailed breakdown.`;
   SpreadsheetApp.getUi().alert(alertMessage);
 }
