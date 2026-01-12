@@ -76,6 +76,12 @@ function fillLeaveData() {
   // Prepare output array
   const outputData = [];
 
+  // Debugging counters
+  let totalCellsProcessed = 0;
+  let totalCellsWithValueGreaterThanZero = 0;
+  let totalRowsGenerated = 0;
+  let skippedCells = [];
+
   // Process each source row
   for (let i = 0; i < sourceData.length; i++) {
     const row = sourceData[i];
@@ -104,13 +110,27 @@ function fillLeaveData() {
       const count = counts[col];
       const sizeValue = sizes[col];
 
-      // Skip if count is 0 or negative
-      if (count <= 0) {
+      totalCellsProcessed++;
+
+      // Debug: Check type and value
+      const countNum = Number(count);
+
+      // Skip if count is not a positive number
+      if (count === "" || count === null || count === undefined || isNaN(countNum) || countNum <= 0) {
+        if (count !== "" && count !== 0 && count !== null && count !== undefined) {
+          // Log unexpected skipped values (first 20 only to avoid spam)
+          if (skippedCells.length < 20) {
+            skippedCells.push({row: sourceRowNum, col: col, value: count, type: typeof count});
+          }
+        }
         continue;
       }
 
+      totalCellsWithValueGreaterThanZero++;
+
       // Create the specified number of rows
-      for (let copy = 0; copy < count; copy++) {
+      for (let copy = 0; copy < countNum; copy++) {
+        totalRowsGenerated++;
         // Create output row with mapped columns
         // Destination columns: B, C, D, E, G, H (skipping F)
         const outputRow = [];
@@ -138,7 +158,19 @@ function fillLeaveData() {
     }
   }
 
-  Logger.log(`Total output rows generated: ${outputData.length}`);
+  // Log debugging statistics
+  Logger.log("=== DEBUGGING STATISTICS ===");
+  Logger.log(`Total cells processed (G-K across all rows): ${totalCellsProcessed}`);
+  Logger.log(`Total cells with value > 0: ${totalCellsWithValueGreaterThanZero}`);
+  Logger.log(`Total rows generated: ${totalRowsGenerated}`);
+  Logger.log(`Total output rows in array: ${outputData.length}`);
+
+  if (skippedCells.length > 0) {
+    Logger.log("\nFirst 20 unexpected skipped cells:");
+    skippedCells.forEach(cell => {
+      Logger.log(`Row ${cell.row}, Col ${cell.col}: value="${cell.value}", type=${cell.type}`);
+    });
+  }
 
   // Write all data to destination sheet at once
   if (outputData.length > 0) {
@@ -149,5 +181,6 @@ function fillLeaveData() {
     Logger.log("No data to write (all counts were 0 or negative)");
   }
 
-  SpreadsheetApp.getUi().alert(`Process complete!\n\nGenerated ${outputData.length} rows in "${DESTINATION_SHEET_NAME}" sheet.`);
+  const alertMessage = `Process complete!\n\nGenerated ${outputData.length} rows in "${DESTINATION_SHEET_NAME}" sheet.\n\nCells processed: ${totalCellsProcessed}\nCells > 0: ${totalCellsWithValueGreaterThanZero}\n\nCheck the Apps Script log (Ctrl/Cmd+Enter) for more details.`;
+  SpreadsheetApp.getUi().alert(alertMessage);
 }
